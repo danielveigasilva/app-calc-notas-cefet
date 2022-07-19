@@ -1,5 +1,6 @@
 import { View, Text, ActivityIndicator, StyleSheet, Image, FlatList, Alert, TouchableOpacity} from 'react-native'
 import {React, useEffect, useState} from 'react'
+import { Picker } from '@react-native-picker/picker';
 
 export default function Materias({ route, navigation }) {
 
@@ -9,32 +10,75 @@ export default function Materias({ route, navigation }) {
   const onScreenLoad = async () => {
     setLoading(true);
     let unmounted = false;
+    setDescricaoLoad("Acessando portal");
 
     try {
 
-      let response = await fetch(endpoint + 'periodos/2022.1/disciplinas?' + 'cookie=' + cookie + '&' + 'matricula=' + matricula);
-      let json = await response.json();
+      setDescricaoLoad("Carregando dados do aluno");
+      let responseDados = await fetch(endpoint + 'perfil?' + 'cookie=' + cookie + '&' + 'matricula=' + matricula);
+      let jsonDados = await responseDados.json();
 
-      //Se conseguiu logar
-      if (json.code == 200) {
-        if(!unmounted){
-          
-          let list = [];
-
-          json.data.forEach(materia => {
-            list = list.concat(materia);
-          });
-          
-          setListMaterias(list);
-          setLoading(false);
-        }
-      }
+      if (jsonDados.code == 200)
+        if(!unmounted)
+          setDadosPerfil(jsonDados.data);
       else {
-        Alert.alert('Ocorreu um erro', json.data);
+        Alert.alert('Ocorreu um erro', jsonDados.data);
         setLoading(false);
       }
 
-    }catch (error) {
+
+      setDescricaoLoad("Carregando períodos");
+      let responsePeriodos = await fetch(endpoint + 'periodos?' + 'cookie=' + cookie + '&' + 'matricula=' + matricula);
+      let jsonPeriodos = await responsePeriodos.json();
+
+      let newListMateriasCache = [];
+      
+      if (jsonPeriodos.code == 200)
+        
+        if(!unmounted){
+
+          setPeriodos(jsonPeriodos.data);
+
+          setDescricaoLoad("Carregando disciplinas");
+          setPeriodoSelecionado(jsonPeriodos.data[0].cod);
+          
+          let responseDisciplinas = await fetch(endpoint + 'periodos/' + jsonPeriodos.data[0].cod + '/disciplinas?' + 'cookie=' + cookie + '&' + 'matricula=' + matricula);
+          let jsonDisciplinas = await responseDisciplinas.json();
+    
+          //Se conseguiu logar
+          if (jsonDisciplinas.code == 200) {
+            if(!unmounted){
+              
+              let list = [];
+    
+              jsonDisciplinas.data.forEach(materia => {
+                list = list.concat(materia);
+              });
+
+              setListMaterias(list);
+
+              newListMateriasCache = jsonPeriodos.data.map((periodo)=>(
+                [{periodoCod: periodo.cod, materias: null}]
+              ));
+              newListMateriasCache[0].materias = list;
+    
+              setListMateriasCache(newListMateriasCache);
+              setLoading(false);
+            }
+          }
+          else {
+            Alert.alert('Ocorreu um erro', jsonDisciplinas.data);
+            setLoading(false);
+          }
+        }
+      else {
+        Alert.alert('Ocorreu um erro', jsonPeriodos.data);
+        setLoading(false);
+      }
+
+      setLoading(false);
+
+    } catch (error) {
       Alert.alert('Ocorreu um erro', 'Algo de errado não está certo: ' + error);
       setLoading(false);
     }
@@ -49,39 +93,107 @@ export default function Materias({ route, navigation }) {
   }, [])
 
   const onBtnMateriaClick = async (materia) => {
-    let info =  "Código : " + materia.codDisciplina + "\n" +
-                "P1     : " + materia.p1 + "\n" +
-                "P2     : " + materia.p2 + "\n" +
-                "PF     : " + materia.pf + "\n" +
-                "Média  : " + materia.media + "\n" +
-                "M Final: " + materia.mediaFinal; 
+    
+    navigation.navigate('Disciplina', {
+      disciplina: materia
+    });
 
-    Alert.alert(materia.nome + ' (' + materia.codTurma + ')', info);
+  }
+
+  const onValueChangePeriodo = async (periodoCod, index) => {
+
+      setPeriodoSelecionado(periodoCod);
+      let unmounted = false;
+
+      if (listMateriasCache[index].materias == null){
+
+        setLoading(true);
+        setDescricaoLoad("Carregando disciplinas (" + periodoCod + ")");
+
+        let responseDisciplinas = await fetch(endpoint + 'periodos/' + periodoCod + '/disciplinas?' + 'cookie=' + cookie + '&' + 'matricula=' + matricula);
+        let jsonDisciplinas = await responseDisciplinas.json();
+
+        if (jsonDisciplinas.code == 200) {
+          if(!unmounted){
+            
+            let list = [];
+
+            jsonDisciplinas.data.forEach(materia => {
+              list = list.concat(materia);
+            });
+            
+            setListMaterias(list);
+            
+            let newListMateriasCache = listMateriasCache;
+            newListMateriasCache[index].materias = list;
+            setListMateriasCache(newListMateriasCache);
+
+            setLoading(false);
+          }
+        }
+        else {
+          Alert.alert('Ocorreu um erro', jsonDisciplinas.data);
+          setLoading(false);
+        }
+      }
+      else
+        setListMaterias(listMateriasCache[index].materias);
+
+      return () => {
+        unmounted = true
+      }
   }
 
   const [loading, setLoading] = useState(false);
+  const [descricaoLoad, setDescricaoLoad] = useState("Carregando");
   const [listMaterias, setListMaterias] = useState([]);
+  const [listMateriasCache, setListMateriasCache] = useState([]);
+  const [dadosPerfil, setDadosPerfil] = useState({});
+  const [periodos, setPeriodos] = useState([]);
+  const [periodoSelecionado, setPeriodoSelecionado] = useState("");
 
   return (
     <View style={styles.conteiner}>
         {loading && (
           <View>
               <ActivityIndicator animating={loading} style={{alignSelf:'center'}}/>
-              <Text style={{alignSelf:'center'}}>Carregando Matérias</Text>
+              <Text style={{alignSelf:'center'}}>{descricaoLoad}</Text>
           </View>
         )}
         {!loading && (
-          <View>
-            {listMaterias.map((mat) => (
-              <TouchableOpacity
-                key={mat.codTurma} 
-                style={styles.button}
-                onPress={() => {onBtnMateriaClick(mat)}}
-                disabled={loading}
+          <View style={styles.conteiner_pagina}>
+            <Text>{"BEM VINDO, " + dadosPerfil?.academico?.nome?.split(" ")[0] + "!"}</Text>
+            <Text>{dadosPerfil?.academico?.curso + " - " + dadosPerfil?.academico?.codCampus}</Text>
+            <View style={styles.conteiner_listagem}>
+              <Picker
+                onValueChange={(periodoCod, index) => onValueChangePeriodo(periodoCod, index)}
+                mode="dropdown"
+                selectedValue={periodoSelecionado}
               >
-                  <Text style={styles.buttonText}>{mat.nome}</Text>
-            </TouchableOpacity>
-            ))}
+                {periodos.map((item, index) => (
+                  <Picker.Item
+                    label={item.cod}
+                    value={item.cod}
+                    index={index}
+                    key={item.cod}
+                  />
+                ))}
+              </Picker>
+              <FlatList
+                data={listMaterias}
+                renderItem={({item}) => 
+                  <View>
+                    <TouchableOpacity 
+                      style={styles.materia}
+                      onPress={()=>onBtnMateriaClick(item)}
+                      >
+                      <Text style={styles.materia_nome}>{item.nome}</Text>
+                      <Text style={styles.materia_turma}>{item.codTurma + " - " + item.situacao}</Text>
+                    </TouchableOpacity>
+                  </View>
+                }
+              />
+            </View>
           </View>
         )}
     </View>
@@ -94,21 +206,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  button:{
-    height: 100,
-    marginTop: 5,
-    backgroundColor:'#38ada9',
-    borderRadius:5,
-    alignSelf:'center',
-    alignItems:'baseline',
-    justifyContent:'center',
-    width:'100%',
-    paddingVertical:10
+  materia:{
+    margin: 13
   },
-  buttonText:{
-    alignSelf:'center',
+  materia_nome: {
     fontSize: 15,
-    color:'#FFFFFF',
     fontWeight:'bold'
+  },
+  materia_turma: {
+    fontSize: 10
+  },
+  conteiner_pagina: {
+    paddingTop: 100
+  },
+  conteiner_listagem: {
+    paddingTop: 50
   }
 })
