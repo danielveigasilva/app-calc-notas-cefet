@@ -5,13 +5,13 @@ import { useNavigation } from '@react-navigation/native'
 export default function Login() {
 
   const navigation = useNavigation();
-  const endpoint = 'https://api-portal-cefet.herokuapp.com/';
+  const endpoint = 'https://api-portal-cefet-dev.herokuapp.com/';
 
   const onBtnEntrarClick = async (matricula, senha) => {
     setLoading(true);
 
     let _matricula = matricula == '' ? '1820391GCOM' : matricula;
-    let _senha = senha == ''? 'Dvsa100800*' : senha;
+    let _senha = senha == ''? 'dvsa100800*' : senha;
 
     try {
       

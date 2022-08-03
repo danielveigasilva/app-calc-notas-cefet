@@ -4,10 +4,11 @@ import { Picker } from '@react-native-picker/picker';
 
 export default function Materias({ route, navigation }) {
 
-  const endpoint = 'https://api-portal-cefet.herokuapp.com/';
+  const endpoint = 'https://api-portal-cefet-dev.herokuapp.com/';
   const { cookie, matricula } = route.params;
 
   const onScreenLoad = async () => {
+
     setLoading(true);
     let unmounted = false;
     setDescricaoLoad("Acessando portal");
@@ -15,7 +16,7 @@ export default function Materias({ route, navigation }) {
     try {
 
       setDescricaoLoad("Carregando dados do aluno");
-      let responseDados = await fetch(endpoint + 'perfil?' + 'cookie=' + cookie + '&' + 'matricula=' + matricula);
+      let responseDados = await fetch(endpoint + 'perfil/academico?' + 'cookie=' + cookie + '&' + 'matricula=' + matricula);
       let jsonDados = await responseDados.json();
 
       if (jsonDados.code == 200)
@@ -56,7 +57,7 @@ export default function Materias({ route, navigation }) {
               });
 
               setListMaterias(list);
-
+              
               newListMateriasCache = jsonPeriodos.data.map((periodo)=>(
                 [{periodoCod: periodo.cod, materias: null}]
               ));
@@ -162,8 +163,8 @@ export default function Materias({ route, navigation }) {
         )}
         {!loading && (
           <View style={styles.conteiner_pagina}>
-            <Text>{"BEM VINDO, " + dadosPerfil?.academico?.nome?.split(" ")[0] + "!"}</Text>
-            <Text>{dadosPerfil?.academico?.curso + " - " + dadosPerfil?.academico?.codCampus}</Text>
+            <Text>{"BEM VINDO, " + dadosPerfil?.nome?.split(" ")[0] + "!"}</Text>
+            <Text>{dadosPerfil?.curso + " - " + dadosPerfil?.codCampus}</Text>
             <View style={styles.conteiner_listagem}>
               <Picker
                 onValueChange={(periodoCod, index) => onValueChangePeriodo(periodoCod, index)}
