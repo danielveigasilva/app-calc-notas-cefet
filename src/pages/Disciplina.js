@@ -12,15 +12,17 @@ export default function Disciplina({ route, navigation }) {
   const [listObjetos, setListObjetos] = useState([]);
   const [formula, setFormula] = useState('(P1 + P2)/2');
   const [media, setMedia] = useState('0,0');
+  const [loading, setLoading] = useState(true);
 
   const onScreenLoad = async () => {
 
     let unmounted = false;
 
     try {          
+          setLoading(true);
           let turmaSave = getTurmaByCod(disciplina.codTurma);
-          if (turmaSave != undefined && turmaSave.notas != null){
 
+          if (turmaSave != undefined && turmaSave.notas != null){
             let listObjects = turmaSave.notas.listObjetos;
 
             setListObjetos(listObjects);
@@ -49,6 +51,7 @@ export default function Disciplina({ route, navigation }) {
                         }) : item);
 
                     setListObjetos(newList);
+                    setLoading(false);
                   }
                 });
 
@@ -57,10 +60,14 @@ export default function Disciplina({ route, navigation }) {
 
           }
           else{
+
             let listObjetos_ = [{name: 'P1', value: disciplina.p1, originalName: 'P1', alert: false, valuePortal: null}, {name: 'P2', value: disciplina.p2, originalName: 'P2', alert: false, valuePortal: null}, {name: 'PF', value: disciplina.pf, originalName: 'PF', alert: false, valuePortal: null}];
+
             setListObjetos(listObjetos_);
             atualizaMedia('(P1 + P2)/2', listObjetos_);
             salvaTurmaAtual(formula, listObjetos_);
+
+            setLoading(false);
           }
 
           return () => {
@@ -205,6 +212,7 @@ export default function Disciplina({ route, navigation }) {
 
                     {item.alert && (
                         <TouchableOpacity 
+                          disabled={loading}
                           onPress={() => onBtAlertClick(index)}>
                             <Icon name="warning" size={25} color="#FF6400" />
                         </TouchableOpacity>
@@ -212,6 +220,7 @@ export default function Disciplina({ route, navigation }) {
 
                     {item.originalName == null && (
                       <TouchableOpacity 
+                        disabled={loading}
                         onPress={() => {onBtRmClick(index)}}
                       >
                         <Icon name="remove" size={25} color="#FF0000" />
@@ -226,11 +235,13 @@ export default function Disciplina({ route, navigation }) {
                       <TextInput
                         style={styles.campo_nome}
                         value={item.name}
+                        editable={!loading}
                         onChangeText={text => onSetNameClick(text, index)}
                       />
                       <TextInput
                         placeholder='Nota'
                         value={item.value}
+                        editable={!loading}
                         onChangeText={text => onSetValueClick(text, index)}
                         placeholderTextColor='#38ada9'
                       />
@@ -252,6 +263,7 @@ export default function Disciplina({ route, navigation }) {
           <TouchableOpacity 
             style={styles.button}
             onPress={() => {onBtAddClick()}}
+            disabled={loading}
           >
             <Text style={styles.buttonText}>Adicionar Avaliação</Text>
           </TouchableOpacity>
