@@ -93,10 +93,13 @@ export default function Materias({ route, navigation }) {
     onScreenLoad();
   }, [])
 
-  const onBtnMateriaClick = async (materia) => {
+  const onBtnMateriaClick = async (materia, codPeriodo) => {
     
     navigation.navigate('Disciplina', {
-      disciplina: materia
+      disciplina: materia,
+      codPeriodo: codPeriodo,
+      cookie: cookie, 
+      matricula: matricula
     });
 
   }
@@ -186,7 +189,7 @@ export default function Materias({ route, navigation }) {
                   <View>
                     <TouchableOpacity 
                       style={styles.materia}
-                      onPress={()=>onBtnMateriaClick(item)}
+                      onPress={()=>onBtnMateriaClick(item, periodoSelecionado)}
                       >
                       <Text style={styles.materia_nome}>{item.nome}</Text>
                       <Text style={styles.materia_turma}>{item.codTurma + " - " + item.situacao}</Text>

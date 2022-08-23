@@ -1,5 +1,5 @@
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigation } from '@react-navigation/native'
 
 export default function Login() {
@@ -56,6 +56,10 @@ export default function Login() {
   const [matricula, setMatricula] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    onBtnEntrarClick(matricula, senha);
+  }, [])
 
   return (
     <View style={styles.conteiner}>

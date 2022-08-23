@@ -1,62 +1,154 @@
-import { View, Text, ActivityIndicator, StyleSheet,TextInput, Image, FlatList, Alert, TouchableOpacity} from 'react-native'
+import { View, Text, StyleSheet,TextInput, Image, FlatList, Alert, TouchableOpacity} from 'react-native'
 import {React, useEffect, useState} from 'react'
-import {createTable, getDBConnection, saveTurma, getTurmaByCod} from '../database/SQLiteManager'
+import {saveTurma, getTurmaByCod} from '../database/SQLiteManager'
+import Icon from 'react-native-vector-icons/FontAwesome'
 
 export default function Disciplina({ route, navigation }) {
 
   const endpoint = 'https://api-portal-cefet-dev.herokuapp.com/';
-  const { disciplina } = route.params;
 
-  const [listObjetos, setListObjetos] = useState([{name: 'p1', value: '8,1'}, {name: 'p2', value: '8,1'}, {name: 'p3', value: '8,1'}]);
+  const { disciplina, codPeriodo, cookie, matricula } = route.params;
+
+  const [listObjetos, setListObjetos] = useState([]);
   const [formula, setFormula] = useState('(P1 + P2)/2');
   const [media, setMedia] = useState('0,0');
 
-  /** 
-   * "codDisciplina": "GCOM1002PE",
-            "codTurma": "T.1002",
-            "media": "8,9",
-            "mediaFinal": "8,9",
-            "nome": "ADMINISTRACAO E ORGANIZACAO EMPRESARIAL",
-            "p1": "10,0",
-            "p2": "7,8",
-            "pf": "",
-            "situacao": "Aprovado"
-  */
   const onScreenLoad = async () => {
-    let turmaSave = getTurmaByCod(disciplina.codTurma);
-    if (turmaSave != undefined && turmaSave.notas != null){
-      setListObjetos(turmaSave.notas.listObjetos);
-      setFormula(turmaSave.notas.formula);
-      atualizaMedia(turmaSave.notas.formula, turmaSave.notas.listObjetos);
+
+    let unmounted = false;
+
+    try {          
+          let turmaSave = getTurmaByCod(disciplina.codTurma);
+          if (turmaSave != undefined && turmaSave.notas != null){
+
+            let listObjects = turmaSave.notas.listObjetos;
+
+            setListObjetos(listObjects);
+            setFormula(turmaSave.notas.formula);
+            atualizaMedia(turmaSave.notas.formula, listObjects);
+
+            let responseDisciplinas = await fetch(endpoint + 'periodos/' + codPeriodo + '/disciplinas?' + 'cookie=' + cookie + '&' + 'matricula=' + matricula);
+            let jsonDisciplinas = await responseDisciplinas.json();
+      
+            if (jsonDisciplinas.code == 200) {
+              if(!unmounted){
+
+                jsonDisciplinas.data.forEach(materia => {
+                  if(materia.codTurma == disciplina.codTurma){
+                    
+                    let newList = listObjects.map((item) => 
+                      (item.originalName == 'P1' && item.value != materia.p1 && materia.p1 != '') || 
+                      (item.originalName == 'P2' && item.value != materia.p2 && materia.p2 != '') ||
+                      (item.originalName == 'PF' && item.value != materia.pf && materia.pf != '') ? 
+                      ({
+                          name: item.name, 
+                          value: item.value, 
+                          originalName: item.originalName, 
+                          alert: true,
+                          valuePortal: item.originalName == 'P1' ? materia.p1 : item.originalName == 'P2' ? materia.p2 : item.originalName == 'PF' ? materia.pf : item.value
+                        }) : item);
+
+                    setListObjetos(newList);
+                  }
+                });
+
+              }
+            }
+
+          }
+          else{
+            let listObjetos_ = [{name: 'P1', value: disciplina.p1, originalName: 'P1', alert: false, valuePortal: null}, {name: 'P2', value: disciplina.p2, originalName: 'P2', alert: false, valuePortal: null}, {name: 'PF', value: disciplina.pf, originalName: 'PF', alert: false, valuePortal: null}];
+            setListObjetos(listObjetos_);
+            atualizaMedia('(P1 + P2)/2', listObjetos_);
+            salvaTurmaAtual(formula, listObjetos_);
+          }
+
+          return () => {
+            unmounted = true
+          }
     }
-    else{
-      let listObjetos_ = [{name: 'P1', value: disciplina.p1}, {name: 'P2', value: disciplina.p2}, {name: 'PF', value: disciplina.pf}];
-      setListObjetos(listObjetos_);
-      atualizaMedia('(P1 + P2)/2', listObjetos_);
-      salvaTurmaAtual(formula, listObjetos_);
+    catch(error){
+      
     }
   }
 
   const onBtAddClick = async () => {
-    let newList = listObjetos.concat({name: 'PX', value: null});
+    let newList = listObjetos.concat({name: 'PX', value: null, originalName: null, alert: false, valuePortal: null});
     setListObjetos(newList);
 
     atualizaMedia(formula, newList);
     salvaTurmaAtual(formula, newList);
   }
 
+  const onBtRmClick = async (indexValue) => {
+
+    Alert.alert(  
+      'Remover Avaliação',  
+      'Tem certeza que deseja remover esta avaliação?',  
+      [  
+          {  
+              text: 'Não',  
+              style: 'cancel',  
+          },  
+          {
+            text: 'Sim', 
+            onPress: () => {
+              let newList = [];
+              for (var index = 0 ; index < listObjetos.length; index++){
+                if (index != indexValue){
+                  newList = newList.concat(listObjetos[index]);
+                }
+              }
+              setListObjetos(newList);
+              atualizaMedia(formula, newList);
+              salvaTurmaAtual(formula, newList);
+            } 
+          },  
+      ]  
+    );  
+
+  }
+
+  const onBtAlertClick = async (indexValue) => {
+
+    let nota = listObjetos[indexValue];
+
+    Alert.alert(  
+      'Diferença de dados',  
+      'Identificamos que nota da avaliação ' + nota.name + ' está com valor ' + nota.value + ' no aplicativo, mas no portal foi atualizada para o valor ' + nota.valuePortal + '. Deseja atualizar a nota?',  
+      [  
+          {  
+              text: 'Não',  
+              style: 'cancel',  
+          },  
+          {
+            text: 'Sim', 
+            onPress: () => {
+              let newList = listObjetos.map((item, index) => index == indexValue ? ({name: item.name, value: item.valuePortal, originalName: item.originalName, alert: false, valuePortal: item.valuePortal}) : item);
+
+              setListObjetos(newList);
+              atualizaMedia(formula, newList);
+              salvaTurmaAtual(formula, newList);
+            } 
+          },  
+      ]  
+    );  
+  }
+
   const onSetNameClick = async (newName, indexName) => {
-    let newList = listObjetos.map((item, index) => index == indexName ? ({name: newName, value: item.value}) : item);
+    let newList = listObjetos.map((item, index) => index == indexName ? ({name: newName, value: item.value, originalName: item.originalName, alert: item.alert, valuePortal: item.valuePortal}) : item);
     setListObjetos(newList);
     atualizaMedia(formula, newList);
     salvaTurmaAtual(formula, newList);
   }
 
   const onSetValueClick = async (newValue, indexValue) => {
-    let newList = listObjetos.map((item, index) => index == indexValue ? ({name: item.name, value: newValue}) : item);
-    setListObjetos(newList);
-    atualizaMedia(formula, newList);
-    salvaTurmaAtual(formula, newList);
+    if (newValue.match(/^\d+(\,\d+)?$/) || newValue == "" || (newValue[newValue.length - 1] == ',' && (newValue.split(',').length - 1) == 1)){
+      let newList = listObjetos.map((item, index) => index == indexValue ? ({name: item.name, value: newValue, originalName: item.originalName, alert: item.alert, valuePortal: item.valuePortal}) : item);
+      setListObjetos(newList);
+      atualizaMedia(formula, newList);
+      salvaTurmaAtual(formula, newList);
+    }
   }
 
   const onSetFormulaClick = async (newValue) => {
@@ -109,7 +201,27 @@ export default function Disciplina({ route, navigation }) {
           <FlatList
                 data={listObjetos}
                 renderItem={({item, index}) => 
-                  <View>
+                  <View style={{flexDirection:'row', alignItems:'center', justifyContent:'center'}}>
+
+                    {item.alert && (
+                        <TouchableOpacity 
+                          onPress={() => onBtAlertClick(index)}>
+                            <Icon name="warning" size={25} color="#FF6400" />
+                        </TouchableOpacity>
+                      )}
+
+                    {item.originalName == null && (
+                      <TouchableOpacity 
+                        onPress={() => {onBtRmClick(index)}}
+                      >
+                        <Icon name="remove" size={25} color="#FF0000" />
+                      </TouchableOpacity>
+                    )}
+
+                    {(!item.alert && item.originalName != null) && (
+                      <Icon name="lock" size={25} color="#0000FF" />
+                    )}
+                    
                     <TouchableOpacity style={styles.campo}>
                       <TextInput
                         style={styles.campo_nome}
@@ -184,11 +296,21 @@ const styles = StyleSheet.create({
     marginBottom: 70,
     marginTop: 20
   },
+  buttonRM:{
+    backgroundColor:'#38ada9',
+    borderRadius:50,
+    alignSelf:'center',
+    alignItems:'baseline',
+    justifyContent:'center',
+    width: '15%',
+    height: '15%',
+    paddingVertical:1
+  },
   buttonText:{
     alignSelf:'center',
-    fontSize: 15,
+    fontSize: 15,  
     marginLeft: 10,
-    marginRight: 10,    
+    marginRight: 10, 
     color:'#FFFFFF',
     fontWeight:'bold'
   }
